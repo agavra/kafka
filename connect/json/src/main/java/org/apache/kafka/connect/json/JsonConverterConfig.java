@@ -16,10 +16,13 @@
  */
 package org.apache.kafka.connect.json;
 
+import static org.apache.kafka.common.config.ConfigDef.ValidString.in;
+
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
 import org.apache.kafka.common.config.ConfigDef.Type;
 import org.apache.kafka.common.config.ConfigDef.Width;
+import org.apache.kafka.connect.json.JsonConverter.SerializationFormat;
 import org.apache.kafka.connect.storage.ConverterConfig;
 
 import java.util.Map;
@@ -39,6 +42,16 @@ public class JsonConverterConfig extends ConverterConfig {
     private static final String SCHEMAS_CACHE_SIZE_DOC = "The maximum number of schemas that can be cached in this converter instance.";
     private static final String SCHEMAS_CACHE_SIZE_DISPLAY = "Schema Cache Size";
 
+    public static final String SERIALIZATION_DECIMAL_FORMAT_CONFIG = "decimal.serialization.format";
+    public static final String SERIALIZATION_DECIMAL_FORMAT_DEFAULT = JsonConverter.SerializationFormat.BINARY.toString();
+    private static final String SERIALIZATION_DECIMAL_FORMAT_DOC = "The serialization format for decimals. Can be either BINARY, TEXT or NUMERIC";
+    private static final String SERIALIZATION_DECIMAL_FORMAT_DISPLAY = "JSON Decimal Serialization Format";
+
+  public static final String DESERIALIZATION_DECIMAL_FORMAT_CONFIG = "decimal.deserialization.format";
+  public static final String DESERIALIZATION_DECIMAL_FORMAT_DEFAULT = JsonConverter.SerializationFormat.BINARY.toString();
+  private static final String DESERIALIZATION_DECIMAL_FORMAT_DOC = "The deserialization format for decimals. Can be either BINARY, TEXT or NUMERIC";
+  private static final String DESERIALIZATION_DECIMAL_FORMAT_DISPLAY = "JSON Decimal Deserialization Format";
+
     private final static ConfigDef CONFIG;
 
     static {
@@ -49,6 +62,19 @@ public class JsonConverterConfig extends ConverterConfig {
                       orderInGroup++, Width.MEDIUM, SCHEMAS_ENABLE_DISPLAY);
         CONFIG.define(SCHEMAS_CACHE_SIZE_CONFIG, Type.INT, SCHEMAS_CACHE_SIZE_DEFAULT, Importance.HIGH, SCHEMAS_CACHE_SIZE_DOC, group,
                       orderInGroup++, Width.MEDIUM, SCHEMAS_CACHE_SIZE_DISPLAY);
+
+        group = "serialization";
+        orderInGroup = 0;
+        CONFIG.define(SERIALIZATION_DECIMAL_FORMAT_CONFIG, Type.STRING,
+            SERIALIZATION_DECIMAL_FORMAT_DEFAULT,
+            in(SerializationFormat.names()), Importance.LOW,
+            SERIALIZATION_DECIMAL_FORMAT_DOC, group, orderInGroup++, Width.MEDIUM,
+            SERIALIZATION_DECIMAL_FORMAT_DISPLAY);
+        CONFIG.define(DESERIALIZATION_DECIMAL_FORMAT_CONFIG, Type.STRING,
+            DESERIALIZATION_DECIMAL_FORMAT_DEFAULT,
+            in(SerializationFormat.names()), Importance.LOW,
+            DESERIALIZATION_DECIMAL_FORMAT_DOC, group, orderInGroup++, Width.MEDIUM,
+            DESERIALIZATION_DECIMAL_FORMAT_DISPLAY);
     }
 
     public static ConfigDef configDef() {
@@ -75,5 +101,23 @@ public class JsonConverterConfig extends ConverterConfig {
      */
     public int schemaCacheSize() {
         return getInt(SCHEMAS_CACHE_SIZE_CONFIG);
+    }
+
+    /**
+     * Get the serialization format for decimal types
+     *
+     * @return the serialization format
+     */
+    public SerializationFormat decimalSerializationFormat() {
+        return JsonConverter.SerializationFormat.forName(getString(SERIALIZATION_DECIMAL_FORMAT_CONFIG));
+    }
+
+    /**
+     * Get the deserialization format for decimal types
+     *
+     * @return the deserialization format
+     */
+    public SerializationFormat decimalDeserializationFormat() {
+      return JsonConverter.SerializationFormat.forName(getString(DESERIALIZATION_DECIMAL_FORMAT_CONFIG));
     }
 }

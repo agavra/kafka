@@ -19,6 +19,7 @@ package org.apache.kafka.connect.json;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.DecimalNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.data.Date;
@@ -32,6 +33,7 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.errors.DataException;
+import org.apache.kafka.connect.json.JsonConverter.SerializationFormat;
 import org.junit.Before;
 import org.junit.Test;
 import org.powermock.reflect.Whitebox;
@@ -212,11 +214,37 @@ public class JsonConverterTest {
     }
 
     @Test
-    public void decimalToConnect() {
+    public void binaryDecimalToConnect() {
         Schema schema = Decimal.schema(2);
         BigDecimal reference = new BigDecimal(new BigInteger("156"), 2);
         // Payload is base64 encoded byte[]{0, -100}, which is the two's complement encoding of 156.
         String msg = "{ \"schema\": { \"type\": \"bytes\", \"name\": \"org.apache.kafka.connect.data.Decimal\", \"version\": 1, \"parameters\": { \"scale\": \"2\" } }, \"payload\": \"AJw=\" }";
+        SchemaAndValue schemaAndValue = converter.toConnectData(TOPIC, msg.getBytes());
+        BigDecimal converted = (BigDecimal) schemaAndValue.value();
+        assertEquals(schema, schemaAndValue.schema());
+        assertEquals(reference, converted);
+    }
+
+    @Test
+    public void numericDecimalToConnect() {
+        converter.configure(Collections.singletonMap(JsonConverterConfig.DESERIALIZATION_DECIMAL_FORMAT_CONFIG, SerializationFormat.NUMERIC.toString()), false);
+        Schema schema = Decimal.schema(2);
+        BigDecimal reference = new BigDecimal(new BigInteger("156"), 2);
+        // payload is a number
+        String msg = "{ \"schema\": { \"type\": \"bytes\", \"name\": \"org.apache.kafka.connect.data.Decimal\", \"version\": 1, \"parameters\": { \"scale\": \"2\" } }, \"payload\": 1.56 }";
+        SchemaAndValue schemaAndValue = converter.toConnectData(TOPIC, msg.getBytes());
+        BigDecimal converted = (BigDecimal) schemaAndValue.value();
+        assertEquals(schema, schemaAndValue.schema());
+        assertEquals(reference, converted);
+    }
+
+    @Test
+    public void textDecimalToConnect() {
+        converter.configure(Collections.singletonMap(JsonConverterConfig.DESERIALIZATION_DECIMAL_FORMAT_CONFIG, SerializationFormat.TEXT.toString()), false);
+        Schema schema = Decimal.schema(2);
+        BigDecimal reference = new BigDecimal(new BigInteger("156"), 2);
+        // Payload is string representing the plain string for decimal
+        String msg = "{ \"schema\": { \"type\": \"bytes\", \"name\": \"org.apache.kafka.connect.data.Decimal\", \"version\": 1, \"parameters\": { \"scale\": \"2\" } }, \"payload\": \"1.56\" }";
         SchemaAndValue schemaAndValue = converter.toConnectData(TOPIC, msg.getBytes());
         BigDecimal converted = (BigDecimal) schemaAndValue.value();
         assertEquals(schema, schemaAndValue.schema());
@@ -582,12 +610,42 @@ public class JsonConverterTest {
 
 
     @Test
-    public void decimalToJson() throws IOException {
+    public void decimalToBinaryJson() throws IOException {
         JsonNode converted = parse(converter.fromConnectData(TOPIC, Decimal.schema(2), new BigDecimal(new BigInteger("156"), 2)));
         validateEnvelope(converted);
         assertEquals(parse("{ \"type\": \"bytes\", \"optional\": false, \"name\": \"org.apache.kafka.connect.data.Decimal\", \"version\": 1, \"parameters\": { \"scale\": \"2\" } }"),
                 converted.get(JsonSchema.ENVELOPE_SCHEMA_FIELD_NAME));
         assertArrayEquals(new byte[]{0, -100}, converted.get(JsonSchema.ENVELOPE_PAYLOAD_FIELD_NAME).binaryValue());
+    }
+
+    @Test
+    public void decimalToNumericJson() throws IOException {
+        converter.configure(
+            Collections.singletonMap(
+                JsonConverterConfig.SERIALIZATION_DECIMAL_FORMAT_CONFIG,
+                SerializationFormat.NUMERIC.toString()),
+            false);
+
+        JsonNode converted = parse(converter.fromConnectData(TOPIC, Decimal.schema(2), new BigDecimal(new BigInteger("156"), 2)));
+        validateEnvelope(converted);
+        assertEquals(parse("{ \"type\": \"bytes\", \"optional\": false, \"name\": \"org.apache.kafka.connect.data.Decimal\", \"version\": 1, \"parameters\": { \"scale\": \"2\" } }"),
+            converted.get(JsonSchema.ENVELOPE_SCHEMA_FIELD_NAME));
+        assertEquals(new BigDecimal("1.56"), converted.get(JsonSchema.ENVELOPE_PAYLOAD_FIELD_NAME).decimalValue());
+    }
+
+    @Test
+    public void decimalToTextJson() throws IOException {
+        converter.configure(
+            Collections.singletonMap(
+                JsonConverterConfig.SERIALIZATION_DECIMAL_FORMAT_CONFIG,
+                SerializationFormat.TEXT.toString()),
+            false);
+
+        JsonNode converted = parse(converter.fromConnectData(TOPIC, Decimal.schema(2), new BigDecimal(new BigInteger("156"), 2)));
+        validateEnvelope(converted);
+        assertEquals(parse("{ \"type\": \"bytes\", \"optional\": false, \"name\": \"org.apache.kafka.connect.data.Decimal\", \"version\": 1, \"parameters\": { \"scale\": \"2\" } }"),
+            converted.get(JsonSchema.ENVELOPE_SCHEMA_FIELD_NAME));
+        assertEquals("1.56", converted.get(JsonSchema.ENVELOPE_PAYLOAD_FIELD_NAME).textValue());
     }
 
     @Test

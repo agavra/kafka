@@ -73,6 +73,10 @@ public class Decimal {
         return new BigDecimal(new BigInteger(value), scale(schema));
     }
 
+    public static BigDecimal toLogical(Schema schema, String value) {
+      return new BigDecimal(value);
+    }
+
     private static int scale(Schema schema) {
         String scaleString = schema.parameters().get(SCALE_FIELD);
         if (scaleString == null)
